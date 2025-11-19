@@ -1,4 +1,6 @@
 const { Pool } = require('pg');
+const fs = require('fs');
+const path = require('path');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -111,6 +113,14 @@ module.exports = async (req, res) => {
       }
       return res.json({ message: 'Link deleted' });
     }
+  }
+
+  // Stats page handler
+  const statsMatch = path.match(/^\/code\/(.+)$/);
+  if (statsMatch && method === 'GET') {
+    const statsHtml = fs.readFileSync(path.join(__dirname, '../public/stats.html'), 'utf8');
+    res.setHeader('Content-Type', 'text/html');
+    return res.send(statsHtml);
   }
 
   // Redirect handler
