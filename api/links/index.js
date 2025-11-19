@@ -6,20 +6,16 @@ const pool = new Pool({
 });
 
 async function initDB() {
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS links (
-        id SERIAL PRIMARY KEY,
-        code VARCHAR(8) UNIQUE NOT NULL,
-        url TEXT NOT NULL,
-        clicks INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        last_clicked TIMESTAMP
-      )
-    `);
-  } catch (err) {
-    console.error('DB init error:', err);
-  }
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS links (
+      id SERIAL PRIMARY KEY,
+      code VARCHAR(8) UNIQUE NOT NULL,
+      url TEXT NOT NULL,
+      clicks INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      last_clicked TIMESTAMP
+    )
+  `);
 }
 
 let dbInitialized = false;
@@ -52,7 +48,7 @@ function isValidCode(code) {
   return /^[A-Za-z0-9]{6,8}$/.test(code);
 }
 
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
   await ensureDB();
 
   if (req.method === 'GET') {
@@ -97,4 +93,4 @@ export default async function handler(req, res) {
   } else {
     res.status(405).json({ error: 'Method not allowed' });
   }
-}
+};

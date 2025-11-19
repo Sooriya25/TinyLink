@@ -1,3 +1,1 @@
-export default function handler(req, res) {
-  res.json({ ok: true, version: '1.0' });
-}
+module.exports = (req, res) => res.json({ ok: true, version: '1.0' });

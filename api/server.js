@@ -6,32 +6,24 @@ require('dotenv').config();
 
 const app = express();
 
-// ---------------------- DATABASE ----------------------
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false } // Required for Neon on Vercel
+  ssl: { rejectUnauthorized: false }
 });
 
-// Initialize database table
 async function initDB() {
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS links (
-        id SERIAL PRIMARY KEY,
-        code VARCHAR(8) UNIQUE NOT NULL,
-        url TEXT NOT NULL,
-        clicks INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        last_clicked TIMESTAMP
-      )
-    `);
-    console.log('Database initialized');
-  } catch (err) {
-    console.error('Database initialization error:', err);
-  }
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS links (
+      id SERIAL PRIMARY KEY,
+      code VARCHAR(8) UNIQUE NOT NULL,
+      url TEXT NOT NULL,
+      clicks INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      last_clicked TIMESTAMP
+    )
+  `);
 }
 
-// Initialize DB on first request
 let dbInitialized = false;
 async function ensureDB() {
   if (!dbInitialized) {
@@ -39,13 +31,11 @@ async function ensureDB() {
     dbInitialized = true;
   }
 }
-
-// ---------------------- MIDDLEWARE ----------------------
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-// ---------------------- UTILITY FUNCTIONS ----------------------
+
 function generateCode() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
@@ -68,25 +58,23 @@ function isValidCode(code) {
   return /^[A-Za-z0-9]{6,8}$/.test(code);
 }
 
-// ---------------------- ROUTES ----------------------
 
-// Health Check
 app.get('/healthz', async (req, res) => {
   await ensureDB();
   res.json({ ok: true, version: '1.0' });
 });
 
-// Dashboard
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
-// Stats Page
+
 app.get('/code/:code', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'stats.html'));
 });
 
-// Create new short link
+
 app.post('/api/links', async (req, res) => {
   try {
     await ensureDB();
@@ -112,7 +100,7 @@ app.post('/api/links', async (req, res) => {
         return res.status(409).json({ error: 'Code already exists' });
       }
     } else {
-      // Generate unique random code
+
       do {
         shortCode = generateCode();
         const exists = await pool.query(
@@ -135,7 +123,7 @@ app.post('/api/links', async (req, res) => {
   }
 });
 
-// Get all links
+
 app.get('/api/links', async (req, res) => {
   try {
     await ensureDB();
@@ -149,7 +137,7 @@ app.get('/api/links', async (req, res) => {
   }
 });
 
-// Get stats for a specific code
+
 app.get('/api/links/:code', async (req, res) => {
   try {
     await ensureDB();
@@ -171,7 +159,7 @@ app.get('/api/links/:code', async (req, res) => {
   }
 });
 
-// Delete a short link
+
 app.delete('/api/links/:code', async (req, res) => {
   try {
     await ensureDB();
@@ -193,7 +181,7 @@ app.delete('/api/links/:code', async (req, res) => {
   }
 });
 
-// Redirect handler (/:code)
+
 app.get('/:code', async (req, res) => {
   try {
     await ensureDB();
@@ -223,5 +211,5 @@ app.get('/:code', async (req, res) => {
   }
 });
 
-// ---------------------- EXPORT FOR VERCEL ----------------------
+
 module.exports = serverless(app);
