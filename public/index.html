@@ -128,12 +128,17 @@
                     <td>${link.last_clicked ? new Date(link.last_clicked).toLocaleDateString() : 'Never'}</td>
                     <td>
                         <div class="actions">
+                            <button onclick="viewStats('${link.code}')" class="btn-icon" title="View stats">📊</button>
                             <button onclick="copyLink('${link.code}')" class="btn-icon" title="Copy link">📋</button>
                             <button onclick="deleteLink('${link.code}')" class="btn-icon danger" title="Delete link">🗑️</button>
                         </div>
                     </td>
                 </tr>
             `).join('');
+        }
+
+        function viewStats(code) {
+            window.location.href = `/code/${code}`;
         }
 
         async function copyLink(code) {
