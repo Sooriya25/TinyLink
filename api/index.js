@@ -65,10 +65,6 @@ function isValidCode(code) {
 }
 
 // Routes
-app.get('/api/healthz', async (req, res) => {
-  await ensureDB();
-  res.json({ ok: true, version: '1.0' });
-});
 
 app.post('/api/links', async (req, res) => {
   try {
