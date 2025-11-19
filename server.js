@@ -6,18 +6,18 @@ require('dotenv').config();
 
 const app = express();
 
-// Database connection
+// ---------------------- DATABASE ----------------------
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: { rejectUnauthorized: false } // Required for Neon on Vercel
 });
 
-// Middleware
+// ---------------------- MIDDLEWARE ----------------------
 app.use(express.json());
-app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static('public'));
 
-// Utility functions
+// ---------------------- UTILITY FUNCTIONS ----------------------
 function generateCode() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
@@ -42,7 +42,7 @@ function isValidCode(code) {
 
 // ---------------------- ROUTES ----------------------
 
-// Health check
+// Health Check
 app.get('/healthz', (req, res) => {
   res.json({ ok: true, version: '1.0' });
 });
@@ -52,12 +52,12 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Stats page
+// Stats Page
 app.get('/code/:code', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'stats.html'));
 });
 
-// Create link
+// Create new short link
 app.post('/api/links', async (req, res) => {
   try {
     const { url, code } = req.body;
@@ -67,20 +67,29 @@ app.post('/api/links', async (req, res) => {
     }
 
     let shortCode = code;
+
     if (shortCode) {
       if (!isValidCode(shortCode)) {
         return res.status(400).json({ error: 'Invalid code format' });
       }
 
-      const existing = await pool.query('SELECT code FROM links WHERE code = $1', [shortCode]);
+      const existing = await pool.query(
+        'SELECT code FROM links WHERE code = $1',
+        [shortCode]
+      );
+
       if (existing.rows.length > 0) {
         return res.status(409).json({ error: 'Code already exists' });
       }
     } else {
+      // Generate unique random code
       do {
         shortCode = generateCode();
-        const existing = await pool.query('SELECT code FROM links WHERE code = $1', [shortCode]);
-        if (existing.rows.length === 0) break;
+        const exists = await pool.query(
+          'SELECT code FROM links WHERE code = $1',
+          [shortCode]
+        );
+        if (exists.rows.length === 0) break;
       } while (true);
     }
 
@@ -96,7 +105,7 @@ app.post('/api/links', async (req, res) => {
   }
 });
 
-// List all links
+// Get all links
 app.get('/api/links', async (req, res) => {
   try {
     const result = await pool.query(
@@ -109,10 +118,11 @@ app.get('/api/links', async (req, res) => {
   }
 });
 
-// Get stats for one code
+// Get stats for a specific code
 app.get('/api/links/:code', async (req, res) => {
   try {
     const { code } = req.params;
+
     const result = await pool.query(
       'SELECT code, url, clicks, created_at, last_clicked FROM links WHERE code = $1',
       [code]
@@ -129,24 +139,28 @@ app.get('/api/links/:code', async (req, res) => {
   }
 });
 
-// Delete link
+// Delete a short link
 app.delete('/api/links/:code', async (req, res) => {
   try {
     const { code } = req.params;
-    const result = await pool.query('DELETE FROM links WHERE code = $1 RETURNING *', [code]);
+
+    const result = await pool.query(
+      'DELETE FROM links WHERE code = $1 RETURNING *',
+      [code]
+    );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Link not found' });
     }
 
-    res.json({ message: 'Link deleted' });
+    res.json({ message: 'Link deleted successfully' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Redirect
+// Redirect handler (/:code)
 app.get('/:code', async (req, res) => {
   try {
     const { code } = req.params;
@@ -156,7 +170,11 @@ app.get('/:code', async (req, res) => {
     }
 
     const result = await pool.query(
-      'UPDATE links SET clicks = clicks + 1, last_clicked = CURRENT_TIMESTAMP WHERE code = $1 RETURNING url',
+      `UPDATE links
+       SET clicks = clicks + 1,
+           last_clicked = CURRENT_TIMESTAMP
+       WHERE code = $1
+       RETURNING url`,
       [code]
     );
 
@@ -171,6 +189,5 @@ app.get('/:code', async (req, res) => {
   }
 });
 
-// Export App as Vercel Serverless Function
-module.exports = app;
-module.exports.handler = serverless(app);
+// ---------------------- EXPORT FOR VERCEL ----------------------
+module.exports = serverless(app);
