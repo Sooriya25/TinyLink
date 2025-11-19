@@ -12,6 +12,34 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false } // Required for Neon on Vercel
 });
 
+// Initialize database table
+async function initDB() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS links (
+        id SERIAL PRIMARY KEY,
+        code VARCHAR(8) UNIQUE NOT NULL,
+        url TEXT NOT NULL,
+        clicks INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_clicked TIMESTAMP
+      )
+    `);
+    console.log('Database initialized');
+  } catch (err) {
+    console.error('Database initialization error:', err);
+  }
+}
+
+// Initialize DB on first request
+let dbInitialized = false;
+async function ensureDB() {
+  if (!dbInitialized) {
+    await initDB();
+    dbInitialized = true;
+  }
+}
+
 // ---------------------- MIDDLEWARE ----------------------
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -43,23 +71,25 @@ function isValidCode(code) {
 // ---------------------- ROUTES ----------------------
 
 // Health Check
-app.get('/healthz', (req, res) => {
+app.get('/healthz', async (req, res) => {
+  await ensureDB();
   res.json({ ok: true, version: '1.0' });
 });
 
 // Dashboard
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
 // Stats Page
 app.get('/code/:code', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'stats.html'));
+  res.sendFile(path.join(__dirname, '..', 'public', 'stats.html'));
 });
 
 // Create new short link
 app.post('/api/links', async (req, res) => {
   try {
+    await ensureDB();
     const { url, code } = req.body;
 
     if (!url || !isValidUrl(url)) {
@@ -108,6 +138,7 @@ app.post('/api/links', async (req, res) => {
 // Get all links
 app.get('/api/links', async (req, res) => {
   try {
+    await ensureDB();
     const result = await pool.query(
       'SELECT code, url, clicks, created_at, last_clicked FROM links ORDER BY created_at DESC'
     );
@@ -121,6 +152,7 @@ app.get('/api/links', async (req, res) => {
 // Get stats for a specific code
 app.get('/api/links/:code', async (req, res) => {
   try {
+    await ensureDB();
     const { code } = req.params;
 
     const result = await pool.query(
@@ -142,6 +174,7 @@ app.get('/api/links/:code', async (req, res) => {
 // Delete a short link
 app.delete('/api/links/:code', async (req, res) => {
   try {
+    await ensureDB();
     const { code } = req.params;
 
     const result = await pool.query(
@@ -163,6 +196,7 @@ app.delete('/api/links/:code', async (req, res) => {
 // Redirect handler (/:code)
 app.get('/:code', async (req, res) => {
   try {
+    await ensureDB();
     const { code } = req.params;
 
     if (!isValidCode(code)) {
