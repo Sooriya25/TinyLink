@@ -113,9 +113,9 @@ module.exports = async (req, res) => {
     }
   }
 
-  // Redirect handler
+  // Redirect handler (exclude /code/ paths)
   const codeMatch = path.match(/^\/(.+)$/);
-  if (codeMatch && method === 'GET') {
+  if (codeMatch && method === 'GET' && !path.startsWith('/code/')) {
     const code = codeMatch[1];
     
     if (!isValidCode(code)) {
