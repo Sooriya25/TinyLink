@@ -51,7 +51,7 @@ module.exports = async (req, res) => {
   const method = req.method;
 
   // Health check
-  if (path === '/api/healthz') {
+  if (path === '/healthz') {
     return res.json({ ok: true, version: '1.0' });
   }
 
