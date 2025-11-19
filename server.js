@@ -1,0 +1,144 @@
+require('dotenv').config();
+const express = require('express');
+const { Pool } = require('pg');
+const path = require('path');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(express.json());
+app.use(express.static('public'));
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
+
+let dbInitialized = false;
+async function ensureDB() {
+  if (!dbInitialized) {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS links (
+        id SERIAL PRIMARY KEY,
+        code VARCHAR(8) UNIQUE NOT NULL,
+        url TEXT NOT NULL,
+        clicks INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_clicked TIMESTAMP
+      )
+    `);
+    dbInitialized = true;
+  }
+}
+
+function generateCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+function isValidUrl(string) {
+  try {
+    new URL(string);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function isValidCode(code) {
+  return /^[A-Za-z0-9]{6,8}$/.test(code);
+}
+
+// Health check
+app.get('/healthz', (req, res) => {
+  res.json({ ok: true, version: '1.0' });
+});
+
+// Get all links
+app.get('/api/links', async (req, res) => {
+  await ensureDB();
+  const result = await pool.query('SELECT code, url, clicks, created_at, last_clicked FROM links ORDER BY created_at DESC');
+  res.json(result.rows);
+});
+
+// Create link
+app.post('/api/links', async (req, res) => {
+  await ensureDB();
+  const { url, code } = req.body;
+  
+  if (!url || !isValidUrl(url)) {
+    return res.status(400).json({ error: 'Invalid URL' });
+  }
+
+  let shortCode = code;
+  if (shortCode) {
+    if (!isValidCode(shortCode)) {
+      return res.status(400).json({ error: 'Invalid code format' });
+    }
+    const existing = await pool.query('SELECT code FROM links WHERE code = $1', [shortCode]);
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: 'Code already exists' });
+    }
+  } else {
+    do {
+      shortCode = generateCode();
+      const existing = await pool.query('SELECT code FROM links WHERE code = $1', [shortCode]);
+      if (existing.rows.length === 0) break;
+    } while (true);
+  }
+
+  await pool.query('INSERT INTO links (code, url) VALUES ($1, $2)', [shortCode, url]);
+  res.status(201).json({ code: shortCode, url });
+});
+
+// Get link stats
+app.get('/api/links/:code', async (req, res) => {
+  await ensureDB();
+  const { code } = req.params;
+  const result = await pool.query('SELECT code, url, clicks, created_at, last_clicked FROM links WHERE code = $1', [code]);
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: 'Link not found' });
+  }
+  res.json(result.rows[0]);
+});
+
+// Delete link
+app.delete('/api/links/:code', async (req, res) => {
+  await ensureDB();
+  const { code } = req.params;
+  const result = await pool.query('DELETE FROM links WHERE code = $1 RETURNING *', [code]);
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: 'Link not found' });
+  }
+  res.json({ message: 'Link deleted' });
+});
+
+// Stats page (must come before redirect handler)
+app.get('/code/:code', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'stats.html'));
+});
+
+// Redirect handler
+app.get('/:code', async (req, res) => {
+  await ensureDB();
+  const { code } = req.params;
+  
+  if (!isValidCode(code)) {
+    return res.status(404).send('Not found');
+  }
+  
+  const result = await pool.query('UPDATE links SET clicks = clicks + 1, last_clicked = CURRENT_TIMESTAMP WHERE code = $1 RETURNING url', [code]);
+  if (result.rows.length === 0) {
+    return res.status(404).send('Not found');
+  }
+  
+  res.redirect(302, result.rows[0].url);
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
