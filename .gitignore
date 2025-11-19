@@ -1,0 +1,19 @@
+# Node dependencies
+node_modules/
+
+# Environment variables (never push sensitive data)
+.env
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Vercel output folder (serverless builds)
+.vercel/
+
+# OS system files
+.DS_Store
+Thumbs.db
+
