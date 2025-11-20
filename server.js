@@ -53,6 +53,11 @@ function isValidCode(code) {
   return /^[A-Za-z0-9]{6,8}$/.test(code);
 }
 
+// Favicon handler
+app.get('/favicon.ico', (req, res) => {
+  res.status(204).end();
+});
+
 // Health check
 app.get('/healthz', (req, res) => {
   res.json({ ok: true, version: '1.0' });
