@@ -113,10 +113,14 @@ module.exports = async (req, res) => {
     }
   }
 
+  // Debug logging
+  console.log('Request path:', path, 'Method:', method);
+  
   // Redirect handler (exclude /code/ paths)
   const codeMatch = path.match(/^\/(.+)$/);
   if (codeMatch && method === 'GET' && !path.startsWith('/code/')) {
     const code = codeMatch[1];
+    console.log('Redirect code:', code, 'Valid:', isValidCode(code));
     
     if (!isValidCode(code)) {
       return res.status(404).send('Not found');

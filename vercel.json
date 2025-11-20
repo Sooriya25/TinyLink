@@ -2,7 +2,6 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/healthz", "destination": "/api" },
-    { "source": "/", "destination": "/public/index.html" },
     { "source": "/code/(.*)", "destination": "/public/stats.html" },
     { "source": "/(.*)", "destination": "/api" }
   ]
